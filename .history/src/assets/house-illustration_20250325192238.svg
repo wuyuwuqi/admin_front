@@ -1,0 +1,38 @@
+<svg width="150" height="120" viewBox="0 0 150 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 房屋主体 -->
+  <path d="M30,80 L30,40 L75,20 L120,40 L120,80 Z" fill="#F0F2F5" stroke="#8A6BFF" stroke-width="2"/>
+  
+  <!-- 屋顶 -->
+  <path d="M20,45 L75,15 L130,45" stroke="#6D5DFC" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- 门 -->
+  <rect x="65" y="55" width="20" height="25" fill="#6D5DFC" rx="2"/>
+  
+  <!-- 窗户 -->
+  <rect x="40" y="45" width="15" height="15" fill="#D4E8FF" stroke="#8A6BFF" stroke-width="1"/>
+  <rect x="95" y="45" width="15" height="15" fill="#D4E8FF" stroke="#8A6BFF" stroke-width="1"/>
+  
+  <!-- 烟囱 -->
+  <rect x="100" y="25" width="8" height="10" fill="#F0F2F5" stroke="#8A6BFF" stroke-width="1"/>
+  
+  <!-- 草地 -->
+  <path d="M10,80 C20,75 40,85 60,80 C80,75 100,85 120,80 C140,75 160,85 180,80 L180,100 L10,100 Z" fill="#A5D6A7"/>
+  
+  <!-- 树 -->
+  <circle cx="130" cy="65" r="10" fill="#81C784"/>
+  <circle cx="125" cy="60" r="8" fill="#66BB6A"/>
+  <circle cx="135" cy="60" r="7" fill="#4CAF50"/>
+  <rect x="130" y="75" width="2" height="10" fill="#795548"/>
+  
+  <!-- 人物 -->
+  <circle cx="30" cy="75" r="5" fill="#9575CD"/>
+  <rect x="28" y="80" width="4" height="10" fill="#7E57C2"/>
+  <line x1="28" y1="85" x2="25" y2="90" stroke="#7E57C2" stroke-width="2"/>
+  <line x1="32" y1="85" x2="35" y2="90" stroke="#7E57C2" stroke-width="2"/>
+  
+  <!-- 第二个人物 -->
+  <circle cx="40" cy="78" r="4" fill="#4DB6AC"/>
+  <rect x="38" y="82" width="4" height="8" fill="#26A69A"/>
+  <line x1="38" y1="86" x2="35" y2="90" stroke="#26A69A" stroke-width="1.5"/>
+  <line x1="42" y1="86" x2="45" y2="90" stroke="#26A69A" stroke-width="1.5"/>
+</svg>

@@ -1,0 +1,360 @@
+<template>
+  <div class="admin-layout">
+    <!-- 左侧导航栏 -->
+    <div class="sidebar" :class="{ 'is-collapsed': isCollapse }">
+      <div class="logo-container">
+        <h2 class="logo-text">共享民宿管理后台</h2>
+      </div>
+      <el-menu
+        class="sidebar-menu"
+        background-color="#304156"
+        text-color="#fff"
+        active-text-color="#409EFF"
+        :default-active="activeMenu"
+        :collapse="isCollapse"
+        router
+      >
+        <el-menu-item index="/">
+          <el-icon><HomeFilled /></el-icon>
+          <span>首页</span>
+        </el-menu-item>
+        <el-sub-menu index="/order">
+          <template #title>
+            <el-icon><Tickets /></el-icon>
+            <span>订单管理</span>
+          </template>
+          <el-menu-item index="/order/pending-payment">
+            <el-tooltip content="待支付订单" placement="right" :show-after="300">
+              <span>订单详情-待支付</span>
+            </el-tooltip>
+          </el-menu-item>
+          <el-menu-item index="/order/in-progress">
+            <el-tooltip content="进行中订单" placement="right" :show-after="300">
+              <span>订单详情-进行中</span>
+            </el-tooltip>
+          </el-menu-item>
+          <el-menu-item index="/order/after-sale">
+            <el-tooltip content="售后中订单" placement="right" :show-after="300">
+              <span>订单详情-售后中</span>
+            </el-tooltip>
+          </el-menu-item>
+          <el-menu-item index="/order/refunded">
+            <el-tooltip content="已退款订单" placement="right" :show-after="300">
+              <span>订单详情-已退款</span>
+            </el-tooltip>
+          </el-menu-item>
+
+          <el-menu-item index="/order/completed">
+            <el-tooltip content="已完成订单" placement="right" :show-after="300">
+              <span>订单详情-已完成</span>
+            </el-tooltip>
+          </el-menu-item>
+          <el-menu-item index="/order/cancelled">
+            <el-tooltip content="已取消订单" placement="right" :show-after="300">
+              <span>订单详情-已取消</span>
+            </el-tooltip>
+          </el-menu-item>
+        </el-sub-menu>
+        <el-menu-item index="/house">
+          <el-icon><House /></el-icon>
+          <span>民宿管理</span>
+        </el-menu-item>
+        <el-menu-item index="/coupon">
+          <el-icon><Discount /></el-icon>
+          <span>优惠券管理</span>
+        </el-menu-item>
+        <el-menu-item index="/role">
+          <el-icon><Avatar /></el-icon>
+          <span>角色管理</span>
+        </el-menu-item>
+        <el-menu-item index="/user">
+          <el-icon><User /></el-icon>
+          <span>用户管理</span>
+        </el-menu-item>
+        <el-menu-item index="/log">
+          <el-icon><Document /></el-icon>
+          <span>操作日志</span>
+        </el-menu-item>
+        <el-menu-item index="/chat">
+          <el-icon><ChatDotRound /></el-icon>
+          <span>消息中心</span>
+        </el-menu-item>
+      </el-menu>
+    </div>
+    
+    <!-- 右侧内容区 -->
+    <div class="main-content">
+      <!-- 顶部导航栏 -->
+      <div class="header">
+        <div class="toggle-sidebar" @click="toggleSidebar">
+          <el-icon>
+            <Expand v-if="isCollapse" />
+            <Fold v-else />
+          </el-icon>
+        </div>
+        <div class="header-right">
+          <el-dropdown>
+            <span class="user-info">
+              <el-avatar :size="32" :icon="UserFilled" />
+              <span>{{ username }}</span>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="navigateToProfile">个人信息</el-dropdown-item>
+                <el-dropdown-item @click="showPasswordDialog">修改密码</el-dropdown-item>
+                <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+      </div>
+      
+      <!-- 内容区域 -->
+      <div class="content">
+        <slot></slot>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 修改密码对话框 -->
+  <el-dialog
+    v-model="passwordDialogVisible"
+    title="修改密码"
+    width="400px"
+  >
+    <el-form :model="passwordForm" label-width="100px" :rules="passwordRules" ref="passwordFormRef">
+      <el-form-item label="旧密码" prop="oldPassword">
+        <el-input v-model="passwordForm.oldPassword" type="password" placeholder="请输入旧密码" show-password></el-input>
+      </el-form-item>
+      <el-form-item label="新密码" prop="newPassword">
+        <el-input v-model="passwordForm.newPassword" type="password" placeholder="请输入新密码" show-password></el-input>
+      </el-form-item>
+      <el-form-item label="确认密码" prop="confirmPassword">
+        <el-input v-model="passwordForm.confirmPassword" type="password" placeholder="请确认新密码" show-password></el-input>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="passwordDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitPasswordForm">确认</el-button>
+      </span>
+    </template>
+  </el-dialog>
+</template>
+
+<script setup>
+import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
+import LandlordStorage from '../../utils/LandlordStorage'
+import { HomeFilled, Tickets, House, User, Fold, Expand, UserFilled, Discount, Avatar, Document, ChatDotRound } from '@element-plus/icons-vue'
+import axios from 'axios'
+import { ElMessage } from 'element-plus'
+
+const router = useRouter()
+const activeMenu = ref('/')
+const username = ref('admin')
+const isCollapse = ref(false)
+
+// 密码对话框相关
+const passwordDialogVisible = ref(false)
+const passwordFormRef = ref(null)
+
+// 密码表单数据
+const passwordForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+// 密码表单验证规则
+const passwordRules = {
+  oldPassword: [
+    { required: true, message: '请输入旧密码', trigger: 'blur' },
+  ],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能少于6个字符', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请确认新密码', trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (value !== passwordForm.newPassword) {
+          callback(new Error('两次输入的密码不一致'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
+}
+
+const toggleSidebar = () => {
+  isCollapse.value = !isCollapse.value
+}
+
+const handleLogout = () => {
+  // 清除登录状态
+  LandlordStorage.clearLoginData()
+  // 跳转到登录页
+  router.push('/login')
+}
+
+const navigateToOrder = () => {
+  // 导航到订单页面，显示全部订单
+  router.push('/order')
+}
+
+const navigateToProfile = () => {
+  // 导航到个人信息页面
+  router.push('/profile')
+}
+
+// 显示修改密码对话框
+const showPasswordDialog = () => {
+  // 重置表单
+  passwordForm.oldPassword = ''
+  passwordForm.newPassword = ''
+  passwordForm.confirmPassword = ''
+  
+  // 显示对话框
+  passwordDialogVisible.value = true
+}
+
+// 提交修改密码表单
+const submitPasswordForm = async () => {
+  if (!passwordFormRef.value) return
+  
+  await passwordFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        // 获取当前登录用户信息
+        const userInfo = LandlordStorage.getUserInfo()
+        if (!userInfo || !userInfo.id) {
+          ElMessage.error('获取用户信息失败，请重新登录')
+          return
+        }
+        
+        // 显示加载状态
+        const loading = ElMessage({
+          message: '正在提交...',
+          duration: 0,
+          type: 'info'
+        })
+        
+        // 调用修改密码API
+        const response = await axios({
+          method: 'post',
+          url: `/api/landlord/updatePassword?landlordId=${userInfo.id}&newPassword=${passwordForm.newPassword}`,
+          headers: {}
+        })
+        
+        // 关闭加载提示
+        loading.close()
+        
+        // 处理响应
+        if (response.data && response.data.statusCode === 200) {
+          ElMessage.success('密码修改成功')
+          // 关闭对话框
+          passwordDialogVisible.value = false
+        } else {
+          ElMessage.error(response.data.message || '密码修改失败')
+        }
+      } catch (error) {
+        console.error('修改密码请求出错:', error)
+        ElMessage.error(`修改密码失败: ${error.message || '未知错误'}`)
+      }
+    }
+  })
+}
+</script>
+
+<style scoped>
+.admin-layout {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 220px;
+  height: 100%;
+  background-color: #304156;
+  transition: width 0.3s;
+  overflow-y: auto;
+}
+
+.sidebar.is-collapsed {
+  width: 64px;
+}
+
+.sidebar.is-collapsed .logo-text {
+  display: none;
+}
+
+.logo-container {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  border-bottom: 1px solid #1f2d3d;
+}
+
+.logo-text {
+  margin: 0;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.sidebar-menu {
+  border-right: none;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: margin-left 0.3s;
+}
+
+.header {
+  height: 60px;
+  background-color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+}
+
+.toggle-sidebar {
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.user-info span {
+  margin-left: 8px;
+}
+
+.content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background-color: #f0f2f5;
+}
+</style>
