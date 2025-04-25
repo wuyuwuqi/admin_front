@@ -76,7 +76,6 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { Search, Plus, Position } from '@element-plus/icons-vue'
 import LandlordStorage from '../utils/LandlordStorage'
 import ChatMessage from './chat/ChatMessage.vue'
@@ -94,7 +93,7 @@ const searchKeyword = ref('')
 const contacts = ref([
   {
     id: 1,
-    name: '张三',
+    name: 'admin4',
     avatar: '',
     online: true,
     lastMessage: '您好，我想咨询一下关于民宿的问题',
@@ -103,7 +102,7 @@ const contacts = ref([
   },
   {
     id: 2,
-    name: '李四',
+    name: 'admin3',
     avatar: '',
     online: true,
     lastMessage: '好的，我知道了，谢谢您的解答！',
@@ -112,7 +111,7 @@ const contacts = ref([
   },
   {
     id: 3,
-    name: '小强',
+    name: 'admin2',
     avatar: '',
     online: false,
     lastMessage: '请问民宿有提供早餐吗？',
@@ -121,7 +120,7 @@ const contacts = ref([
   },
   {
     id: 4,
-    name: '社区网络',
+    name: 'admin1',
     avatar: '',
     online: true,
     lastMessage: '@张三 有问题请联系我',
