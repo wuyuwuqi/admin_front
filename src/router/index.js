@@ -106,13 +106,41 @@ const routes = [
     path: '/chat',
     name: 'Chat',
     component: () => import('../views/Chat.vue'),
-    meta: { requiresAuth: true }
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: '',
+        name: 'ChatDefault',
+        component: () => import('../views/chat/ChatMessage.vue')
+      },
+      {
+        path: ':id(\\d+)',  // 只匹配数字ID
+        name: 'ChatMessage',
+        component: () => import('../views/chat/ChatMessage.vue'),
+        props: true
+      }
+    ]
+  },
+  // 添加通配符路由，处理所有未匹配的路径
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    redirect: (to) => {
+      console.log('未找到路由，重定向到首页:', to)
+      return '/'
+    }
   }
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
+})
+
+// 路由错误处理
+router.onError((error) => {
+  console.error('路由错误:', error)
+  router.push('/')
 })
 
 // 路由守卫

@@ -56,8 +56,8 @@
             </div>
           </div>
 
-          <!-- 使用ChatMessage组件 -->
-          <ChatMessage 
+          <!-- 使用 router-view 来显示子路由内容 -->
+          <router-view
             :username="username"
             :chatWith="currentContact.name"
             :contactId="currentContact.id"
@@ -75,12 +75,12 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { Search, Plus, Position } from '@element-plus/icons-vue'
 import LandlordStorage from '../utils/LandlordStorage'
-import ChatMessage from './chat/ChatMessage.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 // 用户信息
 const username = ref(LandlordStorage.getUserInfo()?.username || '管理员')
@@ -93,7 +93,7 @@ const searchKeyword = ref('')
 const contacts = ref([
   {
     id: 1,
-    name: 'admin4',
+    name: 'admin3',
     avatar: '',
     online: true,
     lastMessage: '您好，我想咨询一下关于民宿的问题',
@@ -102,7 +102,7 @@ const contacts = ref([
   },
   {
     id: 2,
-    name: 'admin3',
+    name: 'admin4',
     avatar: '',
     online: true,
     lastMessage: '好的，我知道了，谢谢您的解答！',
@@ -146,12 +146,23 @@ const currentContact = ref(null)
 
 // 选择联系人
 const selectContact = (contact) => {
+  if (currentContact.value && currentContact.value.id === contact.id) {
+    return
+  }
+  
   currentContact.value = contact
-  // 清除未读消息计数
   if (contact.unreadCount > 0) {
     contact.unreadCount = 0
   }
-  // 滚动到最新消息
+  
+  // 更新路由但不重新加载页面
+  router.replace({
+    name: 'ChatMessage',
+    params: { id: contact.id.toString() }
+  }).catch(() => {
+    console.log('路由更新被取消')
+  })
+  
   nextTick(() => {
     scrollToBottom()
   })
@@ -302,11 +313,42 @@ watch(currentContact, () => {
 
 // 组件挂载后滚动到底部
 onMounted(() => {
-  // 默认选中第一个联系人
-  if (contacts.value.length > 0) {
+  // 从路由参数获取联系人ID
+  const contactId = route.params.id ? parseInt(route.params.id) : null
+  
+  if (contactId) {
+    // 如果URL中有联系人ID，查找并选择该联系人
+    const contact = contacts.value.find(c => c.id === contactId)
+    if (contact) {
+      currentContact.value = contact
+    } else {
+      // 如果找不到对应的联系人，重定向到聊天首页
+      router.replace('/chat')
+    }
+  } else if (contacts.value.length > 0) {
+    // 如果没有指定联系人且有联系人列表，选择第一个联系人
     selectContact(contacts.value[0])
   }
 })
+
+// 监听路由参数变化
+watch(() => route.params.id, (newId) => {
+  if (newId) {
+    const contactId = parseInt(newId)
+    const contact = contacts.value.find(c => c.id === contactId)
+    if (contact) {
+      if (!currentContact.value || currentContact.value.id !== contactId) {
+        currentContact.value = contact
+      }
+    } else {
+      // 如果找不到对应的联系人，重定向到聊天首页
+      router.replace('/chat')
+    }
+  } else if (contacts.value.length > 0 && !currentContact.value) {
+    // 如果没有指定联系人且当前没有选中的联系人，选择第一个联系人
+    selectContact(contacts.value[0])
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>

@@ -43,7 +43,12 @@
 </template>
 
 <script>
+import { useRouter } from 'vue-router'
+import axios from 'axios'
+
 export default {
+  name: 'ChatMessage',
+  
   props: {
     username: {
       type: String,
@@ -59,6 +64,32 @@ export default {
     }
   },
   
+  beforeRouteEnter(to, from, next) {
+    next(vm => {
+      // 组件实例创建后的回调
+      if (vm.socket && vm.socket.readyState === WebSocket.OPEN) {
+        console.log('WebSocket 连接已存在且处于打开状态')
+        return
+      }
+      vm.handleChatChange()
+    })
+  },
+  
+  beforeRouteUpdate(to, from, next) {
+    // 路由参数更新时的处理
+    next()
+    this.handleChatChange()
+  },
+  
+  beforeRouteLeave(to, from, next) {
+    // 在路由离开时清理连接
+    if (this?.socket) {
+      console.log('路由离开，清理 WebSocket 连接')
+      this.closeConnection()
+    }
+    next()
+  },
+  
   data() {
     return {
       inputMsg: '',
@@ -69,20 +100,22 @@ export default {
       lastReceivedTime: null,
       connectionStatus: '正在连接...',
       reconnectAttempts: 0,
-      maxReconnectAttempts: 5
+      maxReconnectAttempts: 5,
+      isConnecting: false,
+      shouldReconnect: true,
+      isConnectionActive: false,
+      isLoadingHistory: false
     }
   },
-  
+
   watch: {
     chatWith: {
-      handler(newVal) {
-        console.log('聊天对象已更改为:', newVal)
-        this.messages = []
-        this.receivedMessageCount = 0
-        this.lastReceivedTime = null
-        this.connectWebSocket()
-      },
-      immediate: true
+      handler(newVal, oldVal) {
+        console.log('聊天对象已更改为:', newVal, '原对象:', oldVal)
+        if (newVal !== oldVal) {
+          this.handleChatChange()
+        }
+      }
     },
     
     messages: {
@@ -96,29 +129,178 @@ export default {
   },
   
   mounted() {
-    this.connectWebSocket()
-    this.messages.push({
-      content: '[系统] 正在连接聊天服务器...',
-      isSystem: true
-    })
+    this.loadHistoryMessages()
+    this.handleChatChange()
   },
   
   beforeUnmount() {
-    if (this.socket) {
-      this.socket.close()
-    }
+    this.closeConnection()
   },
   
   methods: {
+    async loadHistoryMessages() {
+      if (this.isLoadingHistory) return
+      
+      this.isLoadingHistory = true
+      this.connectionStatus = '正在加载历史消息...'
+      
+      try {
+        const response = await axios({
+          method: 'get',
+          url: `/chat/messages`,
+          params: {
+            sender: this.username,
+            receiver: this.chatWith
+          }
+        })
+        
+        // 新接口格式处理
+        const data = response.data
+        let allMessages = []
+        // 处理自己发送的消息（右侧）
+        if (data.sentMessages && Array.isArray(data.sentMessages)) {
+          data.sentMessages.forEach(item => {
+            if (item.MesArray && Array.isArray(item.MesArray)) {
+              item.MesArray.forEach(msg => {
+                allMessages.push({
+                  mes: msg.mes,
+                  time: new Date(msg.time * 1000).toLocaleTimeString(),
+                  isSelf: true
+                })
+              })
+            }
+          })
+        }
+        // 处理接收的消息（左侧）
+        if (data.receivedMessages && Array.isArray(data.receivedMessages)) {
+          data.receivedMessages.forEach(item => {
+            if (item.MesArray && Array.isArray(item.MesArray)) {
+              item.MesArray.forEach(msg => {
+                allMessages.push({
+                  mes: msg.mes,
+                  time: new Date(msg.time * 1000).toLocaleTimeString(),
+                  isSelf: false
+                })
+              })
+            }
+          })
+        }
+        // 按时间排序
+        allMessages.sort((a, b) => {
+          // 还原时间戳进行排序
+          const getTimestamp = (msg) => {
+            // time 字段是 toLocaleTimeString 了，无法直接比较，需保留原始时间戳
+            // 但接口只给了秒级时间戳，需在 push 时保留
+            return msg._timestamp || 0
+          }
+          return (a._timestamp || 0) - (b._timestamp || 0)
+        })
+        // 重新生成带原始时间戳的消息
+        this.messages = []
+        // 重新处理，保留原始时间戳用于排序
+        if (data.sentMessages && Array.isArray(data.sentMessages)) {
+          data.sentMessages.forEach(item => {
+            if (item.MesArray && Array.isArray(item.MesArray)) {
+              item.MesArray.forEach(msg => {
+                this.messages.push({
+                  mes: msg.mes,
+                  time: new Date(msg.time * 1000).toLocaleTimeString(),
+                  isSelf: true,
+                  _timestamp: msg.time
+                })
+              })
+            }
+          })
+        }
+        if (data.receivedMessages && Array.isArray(data.receivedMessages)) {
+          data.receivedMessages.forEach(item => {
+            if (item.MesArray && Array.isArray(item.MesArray)) {
+              item.MesArray.forEach(msg => {
+                this.messages.push({
+                  mes: msg.mes,
+                  time: new Date(msg.time * 1000).toLocaleTimeString(),
+                  isSelf: false,
+                  _timestamp: msg.time
+                })
+              })
+            }
+          })
+        }
+        // 按时间戳排序
+        this.messages.sort((a, b) => a._timestamp - b._timestamp)
+        // 移除 _timestamp 字段
+        this.messages = this.messages.map(msg => {
+          const { _timestamp, ...rest } = msg
+          return rest
+        })
+        this.receivedMessageCount = this.messages.length
+        this.lastReceivedTime = this.messages.length > 0 ? this.messages[this.messages.length - 1].time : null
+        this.$nextTick(() => {
+          this.scrollToBottom()
+        })
+      } catch (error) {
+        console.error('加载历史消息失败:', error)
+        this.messages.push({
+          content: '[系统] 加载历史消息失败',
+          isSystem: true
+        })
+      } finally {
+        this.isLoadingHistory = false
+        // this.connectionStatus = '正在连接...'
+      }
+    },
+
+    handleChatChange() {
+      this.closeConnection()
+      this.messages = []
+      this.receivedMessageCount = 0
+      this.lastReceivedTime = null
+      this.reconnectAttempts = 0
+      this.shouldReconnect = false
+      this.isConnectionActive = false
+      
+      // 先加载历史消息，再显示连接状态
+      this.loadHistoryMessages().then(() => {
+        this.messages.push({
+          content: '[系统] 正在连接聊天服务器...',
+          isSystem: true
+        })
+        this.connectWebSocket()
+      })
+    },
+
+    closeConnection() {
+      if (this.socket && this.isConnectionActive) {
+        console.log('关闭与', this.chatWith, '的连接')
+        this.shouldReconnect = false
+        this.isConnectionActive = false
+        this.socket.close()
+        this.socket = null
+      }
+      this.isConnecting = false
+    },
+
     connectWebSocket() {
+      if (this.isConnecting || this.isConnectionActive) {
+        console.log('已存在活动连接或正在连接中，跳过连接')
+        return
+      }
+
+      this.isConnecting = true
       this.connectionStatus = '正在连接...'
       
       try {
-        this.socket = new WebSocket(`ws://localhost:9090/ws?username=${this.username}&chatWith=${this.chatWith}`)
+        console.log('开始建立新连接:', this.username, this.chatWith)
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws?username=${this.username}&chatWith=${this.chatWith}`
+        console.log('WebSocket 连接地址:', wsUrl)
+        this.socket = new WebSocket(wsUrl)
         
         this.socket.onopen = () => {
           console.log('WebSocket连接已打开')
           this.connectionStatus = '已连接'
+          this.isConnecting = false
+          this.isConnectionActive = true
           this.reconnectAttempts = 0
           this.messages.push({
             content: '[系统] 已连接到聊天服务器',
@@ -143,31 +325,62 @@ export default {
         this.socket.onerror = (error) => {
           console.error('WebSocket错误:', error)
           this.connectionStatus = '连接错误，正在重试...'
+          // 添加更详细的错误日志
+          console.log('WebSocket 错误详情:', {
+            readyState: this.socket?.readyState,
+            url: this.socket?.url,
+            protocol: this.socket?.protocol,
+            bufferedAmount: this.socket?.bufferedAmount
+          })
           this.tryReconnect()
         }
         
-        this.socket.onclose = () => {
-          console.log('WebSocket连接已关闭')
-          this.connectionStatus = '连接已关闭，正在重试...'
-          this.tryReconnect()
+        this.socket.onclose = (event) => {
+          console.log('WebSocket连接已关闭，代码:', event.code, '原因:', event.reason || '无原因')
+          this.isConnectionActive = false
+          this.isConnecting = false
+          
+          if (this.shouldReconnect && event.code !== 1000 && event.code !== 1005) {
+            console.log('尝试重新连接...')
+            this.tryReconnect()
+          } else {
+            this.connectionStatus = '连接已关闭'
+            this.messages.push({
+              content: `[系统] 连接已关闭 (代码: ${event.code}, 原因: ${event.reason || '无原因'})`,
+              isSystem: true
+            })
+          }
         }
         
       } catch (error) {
         console.error('创建WebSocket连接失败:', error)
-        this.connectionStatus = '连接失败，正在重试...'
-        this.tryReconnect()
+        this.connectionStatus = '连接失败'
+        this.isConnecting = false
+        this.isConnectionActive = false
       }
     },
     
     tryReconnect() {
-      if (this.reconnectAttempts < this.maxReconnectAttempts) {
-        this.reconnectAttempts++
-        setTimeout(() => {
-          this.connectWebSocket()
-        }, 3000)
-      } else {
-        this.connectionStatus = '连接失败，请刷新页面重试'
+      if (!this.shouldReconnect || this.isConnectionActive || this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.log('跳过重连：', {
+          shouldReconnect: this.shouldReconnect,
+          isConnectionActive: this.isConnectionActive,
+          reconnectAttempts: this.reconnectAttempts
+        })
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+          this.connectionStatus = '连接失败，请刷新页面重试'
+        }
+        return
       }
+
+      this.reconnectAttempts++
+      console.log(`尝试第 ${this.reconnectAttempts} 次重连...`)
+      
+      setTimeout(() => {
+        if (!this.isConnectionActive && this.shouldReconnect) {
+          this.connectWebSocket()
+        }
+      }, 3000)
     },
     
     sendMessage() {

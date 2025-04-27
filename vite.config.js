@@ -10,6 +10,7 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/',
   plugins: [
     vue(),
     vueDevTools(),
@@ -33,11 +34,28 @@ export default defineConfig({
     }
   },
   server: {
+    port: 5173,
+    strictPort: true,
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
+      },
+      '/ws': {
+        target: 'ws://localhost:9090',
+        ws: true,
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/ws/, '/ws'),
+        timeout: 30000,
+        headers: {
+          'Origin': 'http://localhost:5173'
+        }
+      },
+      '/chat/messages': {
+        target: 'http://localhost:9090',
+        changeOrigin: true
       }
     }
   }
