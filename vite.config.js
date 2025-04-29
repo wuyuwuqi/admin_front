@@ -47,6 +47,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false
       },
+      '/coupons': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false
+      },
       '/ws': {
         target: 'ws://localhost:9090',
         ws: true,

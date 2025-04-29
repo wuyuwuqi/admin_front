@@ -11,18 +11,45 @@
         </template>
         <div class="coupon-table">
           <el-table :data="couponList" style="width: 100%">
-            <el-table-column prop="id" label="ID" width="80" />
+            <el-table-column 
+              prop="id"
+              label="ID"
+              width="120"
+            >
+              <template #default="scope">
+                <span>
+                  {{ scope.row.id ? scope.row.id.slice(0, 6) + '...' + scope.row.id.slice(-4) : '' }}
+                </span>
+              </template>
+            </el-table-column>
             <el-table-column prop="name" label="优惠券名称" width="180" />
             <el-table-column prop="type" label="类型" width="120" />
             <el-table-column prop="value" label="面值/折扣" width="120" />
             <el-table-column prop="minAmount" label="最低消费" width="120" />
+            <el-table-column prop="issued" label="发放数量" width="100" />
             <el-table-column prop="startTime" label="开始时间" width="180" />
             <el-table-column prop="endTime" label="结束时间" width="180" />
             <el-table-column prop="status" label="状态" width="100" />
+            <el-table-column prop="suitableForHomestays" label="适用民宿" width="120">
+              <template #default="scope">
+                {{ scope.row.suitableForHomestays || scope.row.SuitableForHomestays || '' }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="payment" label="领取方式" width="120">
+              <template #default="scope">
+                {{ scope.row.payment || scope.row.Payment || '' }}
+              </template>
+            </el-table-column>
             <el-table-column label="操作">
               <template #default="scope">
-                <el-button size="small" type="primary" @click="openDialog('edit', scope.row)">编辑</el-button>
-                <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+                <div style="display: flex; gap: 8px; justify-content: center; align-items: center;">
+                  <el-button size="small" type="primary" round @click="openDialog('edit', scope.row)">
+                    编辑
+                  </el-button>
+                  <el-button size="small" type="danger" round @click="handleDelete(scope.row)">
+                    删除
+                  </el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -114,6 +141,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import axios from 'axios'
 
 // 对话框相关变量
 const dialogVisible = ref(false)
@@ -162,39 +190,39 @@ const rules = {
   ]
 }
 
-// 模拟数据
-const couponList = ref([
-  {
-    id: 1,
-    name: '新用户优惠券',
-    type: '满减券',
-    value: '100元',
-    minAmount: '500元',
-    startTime: '2023-01-01 00:00:00',
-    endTime: '2023-12-31 23:59:59',
-    status: '有效'
-  },
-  {
-    id: 2,
-    name: '节日特惠券',
-    type: '折扣券',
-    value: '8折',
-    minAmount: '300元',
-    startTime: '2023-05-01 00:00:00',
-    endTime: '2023-05-07 23:59:59',
-    status: '已过期'
-  },
-  {
-    id: 3,
-    name: '会员专享券',
-    type: '满减券',
-    value: '50元',
-    minAmount: '200元',
-    startTime: '2023-06-01 00:00:00',
-    endTime: '2023-12-31 23:59:59',
-    status: '有效'
+// 删除模拟数据
+const couponList = ref([])
+
+const fetchCoupons = async () => {
+  try {
+    const response = await axios({
+      method: 'get',
+      url: '/coupons/allCoupons',
+      headers: {}
+    })
+    // 映射后端字段为前端表格字段
+    couponList.value = (response.data || []).map(item => ({
+      id: item.id,
+      name: item.couponName,
+      type: item.type,
+      value: item.denominationDiscount,
+      minAmount: item.minimumConsumption,
+      issued: item.issued,
+      startTime: item.startTime,
+      endTime: item.endTime,
+      status: item.status,
+      suitableForHomestays: item.suitableForHomestays || item.SuitableForHomestays,
+      payment: item.payment || item.Payment
+    }))
+  } catch (error) {
+    ElMessage.error('获取优惠券数据失败')
+    console.error('获取优惠券数据失败:', error)
   }
-])
+}
+
+onMounted(() => {
+  fetchCoupons()
+})
 
 // 打开对话框
 const openDialog = (type, row) => {
@@ -263,43 +291,45 @@ const handleClose = () => {
 // 提交表单
 const submitForm = async () => {
   if (!couponFormRef.value) return
-  
-  await couponFormRef.value.validate((valid) => {
+  await couponFormRef.value.validate(async (valid) => {
     if (valid) {
-      // 构造提交的数据
+      // 检查关键字段
+      if (!couponForm.name || !couponForm.value || !couponForm.minAmount || !couponForm.quantity || !couponForm.validPeriod[0] || !couponForm.validPeriod[1]) {
+        ElMessage.error('请填写完整表单')
+        return
+      }
+      // 构造提交的数据，字段名和格式与后端一致
       const submitData = {
-        id: couponForm.id,
-        name: couponForm.name,
+        couponName: couponForm.name,
+        denominationDiscount: couponForm.value,
+        minimumConsumption: couponForm.minAmount,
         type: couponForm.type,
-        value: couponForm.type === '满减券' ? couponForm.value + '元' : couponForm.value + '折',
-        minAmount: couponForm.limitType === 0 ? '无限制' : couponForm.minAmount + '元',
-        startTime: couponForm.validPeriod[0] ? couponForm.validPeriod[0].toISOString().split('T')[0] + ' 00:00:00' : '',
-        endTime: couponForm.validPeriod[1] ? couponForm.validPeriod[1].toISOString().split('T')[0] + ' 23:59:59' : '',
-        status: new Date() < new Date(couponForm.validPeriod[1]) ? '有效' : '已过期',
-        quantity: couponForm.quantity,
-        applyTo: couponForm.applyTo,
-        obtainMethod: couponForm.obtainMethod,
-        description: couponForm.description
+        issued: Number(couponForm.quantity),
+        SuitableForHomestays: couponForm.applyTo === 'all' ? '所有民宿' : '指定民宿',
+        startTime: couponForm.validPeriod[0] ? formatDateTimeT(couponForm.validPeriod[0]) : '',
+        endTime: couponForm.validPeriod[1] ? formatDateTimeT(couponForm.validPeriod[1]) : '',
+        Payment: getPaymentText(couponForm.obtainMethod),
+        status: '有效'
       }
-      
-      // 根据操作类型处理数据
-      if (dialogType.value === 'add') {
-        // 模拟添加操作
-        submitData.id = couponList.value.length + 1
-        couponList.value.push(submitData)
-        ElMessage.success('添加成功')
-      } else {
-        // 模拟编辑操作
-        const index = couponList.value.findIndex(item => item.id === submitData.id)
-        if (index !== -1) {
-          couponList.value[index] = submitData
-          ElMessage.success('编辑成功')
+      console.log('添加优惠券请求体:', submitData)
+      try {
+        const response = await axios({
+          method: 'post',
+          url: '/coupons/createCoupon',
+          headers: { 'Content-Type': 'application/json' },
+          data: JSON.stringify(submitData)
+        })
+        if (response.data && response.data.includes('成功')) {
+          ElMessage.success('添加成功')
+          dialogVisible.value = false
+          resetForm()
+          fetchCoupons() // 刷新列表
+        } else {
+          ElMessage.error('添加失败')
         }
+      } catch (error) {
+        ElMessage.error('添加失败: ' + (error.message || '未知错误'))
       }
-      
-      // 关闭对话框
-      dialogVisible.value = false
-      resetForm()
     } else {
       ElMessage.error('请填写完整表单')
       return false
@@ -317,16 +347,41 @@ const handleDelete = (row) => {
       cancelButtonText: '取消',
       type: 'warning'
     }
-  ).then(() => {
-    // 模拟删除操作
-    const index = couponList.value.findIndex(item => item.id === row.id)
-    if (index !== -1) {
-      couponList.value.splice(index, 1)
-      ElMessage.success('删除成功')
+  ).then(async () => {
+    try {
+      const response = await axios({
+        method: 'delete',
+        url: `/coupons/deleteCoupon/${row.id}`,
+        headers: {}
+      })
+      if (response.data && response.data.includes('成功')) {
+        ElMessage.success('删除成功')
+        fetchCoupons() // 删除后刷新列表
+      } else {
+        ElMessage.error('删除失败')
+      }
+    } catch (e) {
+      ElMessage.error('删除失败')
     }
   }).catch(() => {
     ElMessage.info('已取消删除')
   })
+}
+
+// 在 script setup 里添加 formatDateTimeT 工具函数
+function formatDateTimeT(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  const pad = n => n < 10 ? '0' + n : n;
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+
+// 在 script setup 里添加 getPaymentText 工具函数
+function getPaymentText(val) {
+  if (val === 'limited') return '限时领取';
+  if (val === 'newUser') return '新用户专享';
+  if (val === 'activity') return '活动赠送';
+  return val;
 }
 </script>
 
