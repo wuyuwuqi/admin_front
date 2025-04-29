@@ -75,10 +75,11 @@
           <el-date-picker
             v-model="couponForm.validPeriod"
             type="daterange"
-            range-separator="~"
+            range-separator="至"
             start-placeholder="开始日期"
             end-placeholder="结束日期"
             format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
           ></el-date-picker>
         </el-form-item>
         

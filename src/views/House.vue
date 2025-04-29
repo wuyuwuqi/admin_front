@@ -149,14 +149,51 @@
               <el-input v-model="houseForm.reviews" placeholder="请输入评论数，如：5条评论" />
             </el-form-item>
             <el-form-item label="缩略图">
-              <el-upload
-                action="#"
-                list-type="picture-card"
-                :auto-upload="false"
-                :limit="1"
-              >
-                <el-icon><Plus /></el-icon>
-              </el-upload>
+              <div style="display: flex; align-items: center; gap: 20px;">
+                <el-upload
+                  ref="uploadRef"
+                  :action="`/uploadsImg/upload`"
+                  :data="{ category: uploadCategory }"
+                  :headers="{}"
+                  name="file"
+                  :drag="true"
+                  :auto-upload="false"
+                  :before-upload="validateFile"
+                  :on-success="handleImageSuccess"
+                  :on-error="handleImageError"
+                  :on-preview="handlePreview"
+                  :on-change="handleFileChange"
+                  :limit="5"
+                  :show-file-list="true"
+                  :file-list="uploadFileList"
+                  accept="image/*"
+                  style="flex: 1;"
+                >
+                  <el-icon><Plus /></el-icon>
+                  <div>拖拽文件到此处或点击上传</div>
+                  <template #tip>
+                    <div class="el-upload__tip">
+                      只能上传jpg/png文件，且不超过3MB
+                    </div>
+                  </template>
+                </el-upload>
+                <el-select 
+                  v-model="uploadCategory" 
+                  placeholder="请选择分类" 
+                  style="width: 150px; margin-right: 10px;"
+                >
+                  <el-option label="房间图片" value="hotel" />
+                  <el-option label="设施图片" value="facility" />
+                  <el-option label="其他图片" value="other" />
+                </el-select>
+                <el-button type="primary" @click="submitUpload" style="margin-left: 10px;">上传图片</el-button>
+              </div>
+              <!-- 点击文件名时可预览图片 -->
+              <el-image-viewer
+                v-if="previewVisible && previewUrl"
+                :url-list="uploadFileList.map(f => f.url)"
+                @close="previewVisible = false"
+              />
             </el-form-item>
           </el-tab-pane>
           
@@ -310,6 +347,7 @@ import { Plus } from '@element-plus/icons-vue'
 import axios from 'axios'
 import LandlordStorage from '../utils/LandlordStorage'
 import { regionData, codeToText } from 'element-china-area-data'
+import { ElImageViewer } from 'element-plus'
 
 // 筛选条件
 const searchKeyword = ref('')
@@ -332,7 +370,7 @@ const houseForm = ref({
   detailAddress: '', // 详细地址
   landlord_id: '',
   price: 500,
-  image: '',
+  image: [],
   specs: {
     area: '',
     rooms: '',
@@ -373,6 +411,64 @@ const creatorList = ref(['张三三', '李四', '王五'])
 
 // 民宿数据，从后端获取
 const houses = ref([])
+
+// 在 script setup 部分添加 uploadCategory 变量
+const uploadCategory = ref('hotel') // 默认值设为 hotel
+
+// 存储已使用的随机字符串
+const usedRandomStrings = new Set();
+
+// 生成随机8位英文字符串
+const generateRandomString = () => {
+  const chars = 'abcdefghijklmnopqrstuvwxyz';
+  const timestamp = Date.now().toString(36); // 将时间戳转换为36进制
+  
+  const generateNew = () => {
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    // 使用时间戳的后4位和随机字符的前4位组合
+    return result.substring(0, 4) + timestamp.slice(-4);
+  };
+
+  // 生成唯一的字符串
+  let newString = generateNew();
+  while (usedRandomStrings.has(newString)) {
+    newString = generateNew();
+  }
+  
+  // 将新生成的字符串添加到已使用集合中
+  usedRandomStrings.add(newString);
+  
+  // 如果集合太大，清理旧的字符串（保持最近1000个）
+  if (usedRandomStrings.size > 1000) {
+    const iterator = usedRandomStrings.values();
+    usedRandomStrings.delete(iterator.next().value);
+  }
+  
+  return newString;
+}
+
+// 获取完整的category值（包含随机标识）
+const getFullCategory = computed(() => {
+  return `${uploadCategory.value}_${generateRandomString()}`;
+});
+
+// 在 script setup 部分添加 uploadFileList 变量
+const uploadFileList = ref([]) // 用于图片预览
+
+// 在 script setup 部分增加图片预览相关逻辑
+const previewVisible = ref(false)
+const previewUrl = ref('')
+const handlePreview = (file) => {
+  if (file && file.url) {
+    previewUrl.value = file.url
+    previewVisible.value = true
+  } else {
+    ElMessage.warning('无法预览：图片地址无效')
+  }
+}
 
 // 从后端获取民宿数据
 const fetchHouses = async () => {
@@ -569,7 +665,7 @@ const handleAdd = async () => {
       detailAddress: '',
       landlord_id: landlordId,
       price: 500,
-      image: '/static/accommodationImage/hotel1.png',
+      image: [],
       specs: {
         area: '52m²',
         rooms: '2卧2卫1厨',
@@ -688,7 +784,7 @@ const handleEdit = async (id) => {
         detailAddress: detailAddress,
         landlord_id: hotelData.landlord_id || '',
         price: hotelData.price || 0,
-        image: hotelData.image || '',
+        image: hotelData.image || [],
         specs: {
           area: hotelData.specs.area || '',
           rooms: hotelData.specs.rooms || '',
@@ -787,7 +883,6 @@ const saveHouse = async () => {
       ElMessage.warning('请输入民宿名称')
       return
     }
-    // 检查是否选择了省市区或输入了详细地址
     if ((!houseForm.value.areaCode || houseForm.value.areaCode.length === 0) && !houseForm.value.detailAddress) {
       ElMessage.warning('请输入民宿地址')
       return
@@ -796,145 +891,88 @@ const saveHouse = async () => {
       ElMessage.warning('请输入民宿价格')
       return
     }
-    
+
     // 合并省市区和详细地址
     let fullAddress = '';
     if (houseForm.value.areaCode && houseForm.value.areaCode.length > 0) {
-      // 使用codeToText将区域码转为中文名称
       const province = codeToText[houseForm.value.areaCode[0]];
       const city = houseForm.value.areaCode[1] ? codeToText[houseForm.value.areaCode[1]] : '';
       const district = houseForm.value.areaCode[2] ? codeToText[houseForm.value.areaCode[2]] : '';
-      
-      fullAddress = province + (city ? ' ' + city : '') + (district ? ' ' + district : '');
+      fullAddress = province + (city ? city : '') + (district ? district : '');
       if (houseForm.value.detailAddress) {
-        fullAddress += ' ' + houseForm.value.detailAddress;
+        fullAddress += houseForm.value.detailAddress;
       }
     } else {
       fullAddress = houseForm.value.detailAddress || '';
     }
-    
-    // 从LandlordStorage获取当前登录用户信息
+
+    // 获取房东ID
     const userInfo = LandlordStorage.getUserInfo()
-    const landlordId = userInfo?.id || '2'
-    
-    // 准备API请求数据，确保landlordId作为第一个字段
-    // 处理facilities字段，确保它是一个包含basic、bathroom和service三个数组的对象，而不是Proxy数组
-    const formattedFacilities = {
-      basic: Array.isArray(houseForm.value.facilities.basic) ? [...houseForm.value.facilities.basic] : [],
-      bathroom: Array.isArray(houseForm.value.facilities.bathroom) ? [...houseForm.value.facilities.bathroom] : [],
-      service: Array.isArray(houseForm.value.facilities.service) ? [...houseForm.value.facilities.service] : []
-    }
-    
+    const landlordId = userInfo?.id ? String(userInfo.id) : '2'
+
+    // 构造请求体，字段与后端要求一致
     const requestData = {
-      landlordId: landlordId, // 使用从LandlordStorage获取的房东ID
+      landlordId: landlordId,
       name: houseForm.value.name,
       image: houseForm.value.image,
-      address: fullAddress, // 使用合并后的完整地址
+      address: fullAddress,
       price: houseForm.value.price,
-      specs: JSON.parse(JSON.stringify(houseForm.value.specs)), // 深拷贝去除Proxy
-      facilities: formattedFacilities, // 使用格式化后的facilities
-      features: houseForm.value.features,
-      hostInfo: houseForm.value.hostInfo,
-      bookingRules: houseForm.value.bookingRules,
-      rating: houseForm.value.rating,
-      reviews: houseForm.value.reviews,
-      position: houseForm.value.position,
-      characteristics: houseForm.value.characteristics,
-      regionalDivision: houseForm.value.regionalDivision
-    }
-    
-    if (isEdit.value) {
-      // 更新现有民宿
-      // 根据后端提供的接口格式构建请求数据
-      const hotelId = houseForm.value.id
-      
-      // 处理facilities字段，确保它是一个包含basic、bathroom和service三个数组的对象，而不是Proxy数组
-      const formattedFacilities = {
+      specs: {
+        area: houseForm.value.specs.area,
+        rooms: houseForm.value.specs.rooms,
+        capacity: houseForm.value.specs.capacity,
+        features: houseForm.value.specs.features,
+        floor: houseForm.value.specs.floor,
+        type: houseForm.value.specs.type
+      },
+      facilities: {
         basic: Array.isArray(houseForm.value.facilities.basic) ? [...houseForm.value.facilities.basic] : [],
         bathroom: Array.isArray(houseForm.value.facilities.bathroom) ? [...houseForm.value.facilities.bathroom] : [],
         service: Array.isArray(houseForm.value.facilities.service) ? [...houseForm.value.facilities.service] : []
-      }
-      
-      // 构建符合后端要求的请求体 - 直接使用HotelUpdateRequest结构
-      const requestObj = {
-        "name": houseForm.value.name,
-        "address": fullAddress,
-        "price": houseForm.value.price,
-        "specs": {
-          "area": houseForm.value.specs.area || "52m²",
-          "rooms": houseForm.value.specs.rooms || "2卧2卫1厨",
-          "capacity": houseForm.value.specs.capacity || "2床4人",
-          "features": houseForm.value.specs.features || "有窗户",
-          "floor": houseForm.value.specs.floor || "六层",
-          "type": houseForm.value.specs.type || "单人间"
-        },
-        "facilities": {
-          "basic": formattedFacilities.basic || [],
-          "bathroom": formattedFacilities.bathroom || [],
-          "service": formattedFacilities.service || []
-        },
-        "features": (houseForm.value.characteristics || '').toString(),
-        "position": houseForm.value.position || '',
-        "regionalDivision": houseForm.value.regionalDivision || ''
-      }
-      
-      // 添加调试日志，查看请求数据
-      console.log('更新民宿请求数据:', requestObj)
-      
-      // 发送请求到后端API，使用代理方式避免跨域问题
-      const response = await axios({
-        method: 'post',
-        url: `/api/hotel/updateHotel?id=${hotelId}`,
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        data: requestObj
-      })
-      
-      // 添加详细日志，便于调试
-      console.log('更新民宿响应:', response.data)
-      
-      // 根据后端响应格式进行判断，只检查statusCode
-      if (response.data.statusCode === 200) {
-        ElMessage.success(response.data.message || '更新成功')
-        // 刷新民宿列表
-        await fetchHouses() // 使用await确保数据刷新完成
-        // 关闭对话框前确保数据已刷新
-        dialogVisible.value = false
-      } else {
-        console.error('更新失败，响应数据:', response.data)
-        ElMessage.error(response.data.message || '更新失败')
-      }
+      },
+      features: houseForm.value.features,
+      hostInfo: {
+        name: houseForm.value.hostInfo.name,
+        avatar: houseForm.value.hostInfo.avatar,
+        link: houseForm.value.hostInfo.link,
+        description: houseForm.value.hostInfo.description
+      },
+      bookingRules: {
+        checkIn: houseForm.value.bookingRules.checkIn,
+        deposit: houseForm.value.bookingRules.deposit,
+        addCustFee: houseForm.value.bookingRules.addCustFee,
+        landlordRequest: Array.isArray(houseForm.value.bookingRules.landlordRequest) ? [...houseForm.value.bookingRules.landlordRequest] : [],
+        cancelPolicy: houseForm.value.bookingRules.cancelPolicy
+      },
+      rating: houseForm.value.rating,
+      reviews: houseForm.value.reviews,
+      position: houseForm.value.position,
+      characteristics: Array.isArray(houseForm.value.characteristics) ? [...houseForm.value.characteristics] : [],
+      regionalDivision: houseForm.value.regionalDivision
+    }
+
+    // 打印请求体，方便调试
+    console.log('添加民宿请求体:', requestData)
+
+    // 发送请求
+    const response = await axios({
+      method: 'post',
+      url: `/api/hotel/addHotel`,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      params: { landlordId },
+      data: JSON.stringify(requestData)
+    })
+
+    console.log('添加民宿响应:', response.data)
+    if (response.data.statusCode === 200) {
+      ElMessage.success(response.data.message || '添加成功')
+      await fetchHouses()
+      dialogVisible.value = false
+      uploadFileList.value = [] // 清空图片预览
     } else {
-      // 添加新民宿
-      // 使用JSON.stringify和JSON.parse进行深拷贝，确保去除Vue的响应式Proxy
-      const cleanData = JSON.parse(JSON.stringify(requestData))
-      
-      console.log('添加民宿请求数据(格式化后):', cleanData)
-      
-      const response = await axios({
-        method: 'post',
-        url: '/api/hotel/addHotel',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        data: cleanData // 直接使用清理后的数据，axios会自动序列化
-      })
-      
-      // 添加详细日志，便于调试
-      console.log('添加民宿响应:', response.data)
-      
-      // 根据后端新的响应格式进行判断
-      if (response.data.statusCode === 200) {
-        ElMessage.success(response.data.message || '添加成功')
-        // 刷新民宿列表
-        await fetchHouses() // 使用await确保数据刷新完成
-        // 关闭对话框前确保数据已刷新
-        dialogVisible.value = false
-      } else {
-        console.error('添加失败，响应数据:', response.data)
-        ElMessage.error(response.data.message || '添加失败')
-      }
+      ElMessage.error(response.data.message || '添加失败')
     }
   } catch (error) {
     console.error('保存民宿失败:', error)
@@ -945,6 +983,65 @@ const saveHouse = async () => {
 // 关闭对话框
 const handleDialogClose = () => {
   dialogVisible.value = false
+}
+
+// 图片上传校验
+const validateFile = (file) => {
+  const isImage = file.type.startsWith('image/')
+  const isLt3M = file.size / 1024 / 1024 < 3
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg']
+  
+  if (!allowedTypes.includes(file.type)) {
+    ElMessage.error('只能上传 JPG/PNG 格式的图片！')
+    return false
+  }
+  if (!isLt3M) {
+    ElMessage.error('图片大小不能超过3MB！')
+    return false
+  }
+  
+  return true
+}
+
+// 图片上传成功回调
+const handleImageSuccess = (response, file, fileList) => {
+  let imageUrl = ''
+  if (typeof response === 'string') {
+    imageUrl = response
+  } else if (response && response.url) {
+    imageUrl = response.url
+  } else if (response && response.data) {
+    imageUrl = response.data
+  }
+  if (imageUrl) {
+    file.url = imageUrl
+    // 多图：houseForm.value.image 为数组，收集所有图片url
+    houseForm.value.image = uploadFileList.value.map(f => f.url)
+    ElMessage.success('图片上传成功')
+  } else {
+    ElMessage.error('图片上传失败：无法获取图片URL')
+  }
+}
+
+// 图片上传失败回调
+const handleImageError = (error, file) => {
+  console.error('上传错误:', error)
+  ElMessage.error('图片上传失败：' + (error.message || '网络错误，请重试'))
+}
+
+const uploadRef = ref(null)
+const submitUpload = () => {
+  if (uploadRef.value) {
+    uploadRef.value.submit()
+  }
+}
+
+// script setup 部分添加 handleFileChange 方法
+const handleFileChange = (file, fileList) => {
+  uploadFileList.value = fileList.map(f => ({
+    ...f,
+    url: f.url || (f.raw ? URL.createObjectURL(f.raw) : '')
+  }))
 }
 
 onMounted(() => {

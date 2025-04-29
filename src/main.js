@@ -2,6 +2,8 @@ import './assets/main.css'
 
 import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import ElementPlus from 'element-plus'
+import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 
 import { createApp } from 'vue'
 import App from './App.vue'
@@ -24,5 +26,6 @@ if (redirect) {
     })
 }
 
+app.use(ElementPlus, { locale: zhCn })
 app.use(router)
 app.mount('#app')

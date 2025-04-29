@@ -42,6 +42,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       },
+      '/uploadsImg': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false
+      },
       '/ws': {
         target: 'ws://localhost:9090',
         ws: true,
