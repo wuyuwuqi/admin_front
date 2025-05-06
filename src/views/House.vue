@@ -45,11 +45,6 @@
         <el-table-column prop="name" label="民宿名称" width="120" />
         <el-table-column prop="address" label="地址" width="200" />
         <el-table-column prop="rentType" label="房屋类型" width="100" />
-        <el-table-column prop="deposit" label="押金" width="100">
-          <template #default="scope">
-            <span>¥{{ scope.row.deposit }}</span>
-          </template>
-        </el-table-column>
         <el-table-column prop="rent" label="租金" width="100">
           <template #default="scope">
             <span>¥{{ scope.row.rent }}</span>
@@ -144,9 +139,6 @@
             </el-form-item>
             <el-form-item label="评分">
               <el-rate v-model="houseForm.rating" :max="5" />
-            </el-form-item>
-            <el-form-item label="评论数">
-              <el-input v-model="houseForm.reviews" placeholder="请输入评论数，如：5条评论" />
             </el-form-item>
             <el-form-item label="缩略图">
               <div style="display: flex; align-items: center; gap: 20px;">
@@ -399,7 +391,6 @@ const houseForm = ref({
     cancelPolicy: ''
   },
   rating: 5,
-  reviews: '',
   position: '',
   characteristics: [],
   regionalDivision: '',
@@ -489,7 +480,6 @@ const fetchHouses = async () => {
       name: item.name,
       address: item.address,
       rentType: item.specs?.type || '日租', // 使用房间类型作为租赁类型
-      deposit: 300, // 默认押金
       rent: item.price, // 使用价格作为租金
       thumbnail: item.image, // 使用图片路径
       description: item.features || item.description || '', // 使用特色或描述
@@ -625,7 +615,6 @@ const fetchDefaultHouseTemplate = async () => {
           cancelPolicy: templateData.bookingRules.cancelPolicy || '预订成功后30分钟内可免费取消订单，不收取费用；30分钟后取消将收取100%房费，查看详情'
         },
         rating: templateData.rating || 5,
-        reviews: templateData.reviews || '0条评论',
         position: templateData.position || '',
         characteristics: templateData.characteristics || [],
         regionalDivision: templateData.regionalDivision || '',
@@ -694,7 +683,6 @@ const handleAdd = async () => {
         cancelPolicy: '预订成功后30分钟内可免费取消订单，不收取费用；30分钟后取消将收取100%房费，查看详情'
       },
       rating: 5,
-      reviews: '0条评论',
       position: '',
       characteristics: [],
       regionalDivision: '',
@@ -813,7 +801,6 @@ const handleEdit = async (id) => {
           cancelPolicy: hotelData.bookingRules.cancelPolicy || ''
         },
         rating: hotelData.rating || 5,
-        reviews: hotelData.reviews || '',
         position: hotelData.position || '',
         characteristics: hotelData.characteristics || [],
         regionalDivision: hotelData.regionalDivision || '',
@@ -945,7 +932,6 @@ const saveHouse = async () => {
         cancelPolicy: houseForm.value.bookingRules.cancelPolicy
       },
       rating: houseForm.value.rating,
-      reviews: houseForm.value.reviews,
       position: houseForm.value.position,
       characteristics: Array.isArray(houseForm.value.characteristics) ? [...houseForm.value.characteristics] : [],
       regionalDivision: houseForm.value.regionalDivision
