@@ -68,6 +68,10 @@
           <el-icon><ChatDotRound /></el-icon>
           <span>消息中心</span>
         </el-menu-item>
+        <el-menu-item index="/my-comments">
+          <el-icon><Document /></el-icon>
+          <span>我的评论</span>
+        </el-menu-item>
         <el-menu-item index="/coupon">
           <el-icon><Discount /></el-icon>
           <span>优惠券管理</span>

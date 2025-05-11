@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LandlordStorage from '../utils/LandlordStorage'
+import MyComments from '../views/MyComments.vue'
 
 const routes = [
   {
@@ -120,6 +121,11 @@ const routes = [
         props: true
       }
     ]
+  },
+  {
+    path: '/my-comments',
+    name: 'MyComments',
+    component: MyComments
   },
   // 添加通配符路由，处理所有未匹配的路径
   {
