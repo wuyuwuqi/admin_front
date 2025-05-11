@@ -10,7 +10,8 @@
             <el-tag v-else-if="comment.reportStatus === 'normal'" type="success">正常</el-tag>
             <span v-else>--</span>
           </div>
-          <div class="comment-keywords-topic-row">
+          <div class="comment-keywords-top
+          ic-row">
             <div class="comment-keywords">
               <el-tag v-for="(kw, idx) in comment.keywords" :key="idx" type="info" style="margin-right: 4px;">{{ kw }}</el-tag>
             </div>
@@ -55,6 +56,7 @@
               </div>
             </el-card>
           </div>
+          <div v-if="comment.orderId" class="comment-order-id">订单ID：{{ comment.orderId }}</div>
         </el-card>
       </div>
     </el-card>
@@ -300,7 +302,7 @@ onMounted(() => {
   color: #21b66f;
   font-size: 13px;
   text-align: right;
-  margin-top: 0;
+  margin-top: 3px;
   white-space: nowrap;
   border-radius: 8px;
   padding: 0 10px;
@@ -317,6 +319,14 @@ onMounted(() => {
   color: #888;
   font-size: 15px;
   font-weight: 500;
+  z-index: 2;
+}
+.comment-order-id {
+  position: absolute;
+  right: 18px;
+  bottom: 12px;
+  color: #aaa;
+  font-size: 13px;
   z-index: 2;
 }
 </style> 

@@ -87,6 +87,16 @@
                   <el-icon><View /></el-icon>
                   查看
                 </el-button>
+                <el-button
+                  v-if="scope.row.status === 'checkedIn'"
+                  size="small"
+                  type="success"
+                  plain
+                  @click="markOrderCompleted(scope.row)"
+                  style="margin-left: 8px;"
+                >
+                  已经离店
+                </el-button>
                 <el-button 
                   size="small" 
                   type="primary" 
@@ -749,7 +759,7 @@ const markCheckedIn = async (orderId) => {
     // 构建请求配置
     const config = {
       method: 'post',
-      url: '/api/booking/updateBookingStatus',
+      url: '/booking/updateBookingStatus',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': token,
@@ -804,7 +814,7 @@ const confirmRefund = async (orderId) => {
     // 构建请求配置
     const config = {
       method: 'post',
-      url: '/api/booking/updateBookingStatus',
+      url: '/booking/updateBookingStatus',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': token,
@@ -859,7 +869,7 @@ const markCheckedInFromAfterSale = async (orderId) => {
     // 构建请求配置
     const config = {
       method: 'post',
-      url: '/api/booking/updateBookingStatus',
+      url: '/booking/updateBookingStatus',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': token,
@@ -960,6 +970,31 @@ onMounted(() => {
   // 从API获取订单数据
   fetchOrders()
 })
+
+// 已经离店按钮逻辑
+const markOrderCompleted = async (order) => {
+  try {
+    const data = JSON.stringify({
+      orderId: order.id,
+      oldStatus: 'checkedIn',
+      newStatus: 'completed'
+    })
+    const res = await axios({
+      method: 'post',
+      url: '/booking/updateBookingStatus',
+      headers: { 'Content-Type': 'application/json' },
+      data
+    })
+    if (res.data && res.data.message === '订单状态更新成功') {
+      ElMessage.success('订单状态更新成功')
+      fetchOrders()
+    } else {
+      ElMessage.error(res.data.message || '订单状态更新失败')
+    }
+  } catch (e) {
+    ElMessage.error('订单状态更新失败')
+  }
+}
 </script>
 
 <style scoped>
